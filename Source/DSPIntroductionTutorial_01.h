@@ -56,7 +56,14 @@ public:
     CustomOscillator()
     {
         auto& osc = processorChain.template get<oscIndex>();
-        osc.initialise([] (Type x) { return std::sin(x); }, 128);
+        osc.initialise([] (Type x)
+        {
+            return juce::jmap(x,
+                              Type (-juce::MathConstants<double>::pi),
+                              Type (juce::MathConstants<double>::pi),
+                              Type (-1),
+                              Type (1));
+        }, 2);
     }
 
     //==============================================================================
@@ -110,6 +117,10 @@ public:
     {
         auto& masterGain = processorChain.get<masterGainIndex>();
         masterGain.setGainLinear (0.7f);
+        
+        auto& filter = processorChain.get<filterIndex>();
+        filter.setCutoffFrequencyHz(1000.0f);
+        filter.setResonance(0.7f);
     }
 
     //==============================================================================
@@ -125,15 +136,23 @@ public:
         auto velocity = getCurrentlyPlayingNote().noteOnVelocity.asUnsignedFloat();
         auto freqHz = (float) getCurrentlyPlayingNote().getFrequencyInHertz();
 
-        processorChain.get<osc1Index>().setFrequency (freqHz, true);
-        processorChain.get<osc1Index>().setLevel (velocity);
+        processorChain.get<osc1Index>().setFrequency(freqHz, true);
+        processorChain.get<osc1Index>().setLevel(velocity);
+        
+        processorChain.get<osc2Index>().setFrequency(freqHz * 1.01f, true);
+        processorChain.get<osc2Index>().setLevel(velocity);
+        
+        processorChain.get<osc3Index>().setFrequency(freqHz * 0.99f, true);
+        processorChain.get<osc3Index>().setLevel(velocity);
     }
 
     //==============================================================================
     void notePitchbendChanged() override
     {
         auto freqHz = (float) getCurrentlyPlayingNote().getFrequencyInHertz();
-        processorChain.get<osc1Index>().setFrequency (freqHz);
+        processorChain.get<osc1Index>().setFrequency(freqHz);
+        processorChain.get<osc2Index>().setFrequency(freqHz * 1.01f);
+        processorChain.get<osc3Index>().setFrequency(freqHz * 0.99f);
     }
 
     //==============================================================================
@@ -168,10 +187,13 @@ private:
     enum
     {
         osc1Index,
+        osc2Index,
+        osc3Index,
+        filterIndex,
         masterGainIndex
     };
 
-    juce::dsp::ProcessorChain<CustomOscillator<float>, juce::dsp::Gain<float>> processorChain;
+    juce::dsp::ProcessorChain<CustomOscillator<float>, CustomOscillator<float>, CustomOscillator<float>, juce::dsp::LadderFilter<float>, juce::dsp::Gain<float>> processorChain;
 
     static constexpr size_t lfoUpdateRate = 100;
 };
